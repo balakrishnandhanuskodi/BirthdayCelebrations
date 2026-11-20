@@ -11,8 +11,11 @@ const modPin = () => {
 
 interface VideoInfo {
   exists: boolean;
+  /** "upload" when running `pnpm party` locally; "link" on Netlify (paste a URL). */
+  mode?: "upload" | "link";
   name?: string;
   size?: number;
+  url?: string;
 }
 
 const mb = (n = 0) => `${(n / 1024 / 1024).toFixed(n > 100 * 1024 * 1024 ? 0 : 1)} MB`;
@@ -26,6 +29,8 @@ export function ModeratorSetup() {
   const [progress, setProgress] = useState<number | null>(null);
   const [videoError, setVideoError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [link, setLink] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/acts")
@@ -75,9 +80,27 @@ export function ModeratorSetup() {
     xhr.send(file);
   };
 
+  const saveLink = async () => {
+    setVideoError("");
+    setLinkBusy(true);
+    try {
+      const r = await fetch("/api/video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: modPin(), url: link.trim() }) });
+      const d = await r.json();
+      if (!r.ok) setVideoError(d.error || "Couldn't save the link");
+      else {
+        setVideo(d);
+        setLink("");
+      }
+    } catch {
+      setVideoError("Couldn't save the link");
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   const removeVideo = async () => {
-    await fetch("/api/video", { method: "DELETE", headers: { "x-mod-pin": modPin() } }).catch(() => {});
-    setVideo({ exists: false });
+    await fetch("/api/video", { method: "DELETE", headers: { "x-mod-pin": modPin(), "Content-Type": "application/json" }, body: JSON.stringify({ pin: modPin() }) }).catch(() => {});
+    setVideo((v) => ({ exists: false, mode: v.mode }));
   };
 
   return (
@@ -113,19 +136,29 @@ export function ModeratorSetup() {
 
           <div className="mod-section">
             <b>🎬 Team video for the finale</b>
-            <small>Plays for everyone when Charuta reaches the Party Castle, before the celebration. MP4, ideally under 300 MB.</small>
+            <small>
+              Plays for everyone when Charuta reaches the Party Castle, before the celebration.{" "}
+              {video.mode === "link" ? "Paste a direct link to the MP4 file (it must play when opened in a browser tab)." : "MP4, ideally under 300 MB."}
+            </small>
             {video.exists ? (
               <div className="video-file">
                 <span>
-                  ✅ {video.name} <em>({mb(video.size)})</em>
+                  ✅ {video.name} {video.size ? <em>({mb(video.size)})</em> : null}
                 </span>
                 <div>
-                  <a href="/api/video" target="_blank" rel="noreferrer">
+                  <a href={video.url || "/api/video"} target="_blank" rel="noreferrer">
                     Preview
                   </a>
-                  <button onClick={() => fileRef.current?.click()}>Replace</button>
+                  {video.mode !== "link" && <button onClick={() => fileRef.current?.click()}>Replace</button>}
                   <button onClick={removeVideo}>Remove</button>
                 </div>
+              </div>
+            ) : video.mode === "link" ? (
+              <div className="video-link">
+                <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…/team-video.mp4" />
+                <button className="mod-save" onClick={saveLink} disabled={linkBusy || !link.trim()}>
+                  {linkBusy ? "Saving…" : "Save video link"}
+                </button>
               </div>
             ) : (
               <button className="mod-save" onClick={() => fileRef.current?.click()} disabled={progress !== null}>

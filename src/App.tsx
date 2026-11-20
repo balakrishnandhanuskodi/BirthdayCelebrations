@@ -28,11 +28,17 @@ export default function App() {
     setError("");
     try {
       const res = await fetch("/api/join", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...r, id: deviceId() }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not join");
+      const text = await res.text();
+      let data: { error?: string; token?: string; url?: string; identity?: string } = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("The party server isn't responding properly. Please tell the host.");
+      }
+      if (!res.ok || !data.token) throw new Error(data.error || "Could not join");
       // Remember this session so a page refresh rejoins automatically.
       sessionStorage.setItem("party-join", JSON.stringify(r));
-      setJoin({ token: data.token, url: data.url, identity: data.identity, role: r.role, name: r.name });
+      setJoin({ token: data.token, url: data.url ?? "", identity: data.identity ?? "", role: r.role, name: r.name });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join. Check your connection.");
     } finally {

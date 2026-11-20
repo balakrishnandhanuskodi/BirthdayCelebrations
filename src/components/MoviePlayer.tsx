@@ -20,6 +20,14 @@ export function MoviePlayer({ party, isCharuta, canControl, charuta, speaking, o
   const [needsTap, setNeedsTap] = useState(false);
   const [failed, setFailed] = useState(false);
   const [done, setDone] = useState(false);
+  // Hosted (Netlify): the film is a link; local party: served from /api/video.
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/api/video/info")
+      .then((r) => r.json())
+      .then((d) => setSrc(d.url || "/api/video"))
+      .catch(() => setSrc("/api/video"));
+  }, []);
   const partyRef = useRef(party);
   partyRef.current = party;
 
@@ -47,6 +55,7 @@ export function MoviePlayer({ party, isCharuta, canControl, charuta, speaking, o
       play();
     };
     v.addEventListener("loadedmetadata", onMeta);
+    if (v.readyState >= 1) onMeta();
     // Gently keep everyone in sync.
     const sync = setInterval(() => {
       if (!v.duration || v.paused) return;
@@ -58,16 +67,16 @@ export function MoviePlayer({ party, isCharuta, canControl, charuta, speaking, o
       clearInterval(sync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [src]);
 
   return (
     <div className="movie-screen" role="dialog" aria-label="A film for Charuta">
       <div className="movie-title">🎬 A special film for Charuta, from her team ❤️</div>
       <div className="movie-frame">
-        {!failed ? (
+        {!failed && src ? (
           <video
             ref={ref}
-            src="/api/video"
+            src={src}
             playsInline
             preload="auto"
             onEnded={() => {
@@ -79,7 +88,7 @@ export function MoviePlayer({ party, isCharuta, canControl, charuta, speaking, o
               if (isCharuta) setTimeout(onEnded, 1500);
             }}
           />
-        ) : (
+        ) : !src ? null : (
           <div className="movie-failed">The film couldn't load on this device. The celebration starts in a moment…</div>
         )}
         {needsTap && !failed && (

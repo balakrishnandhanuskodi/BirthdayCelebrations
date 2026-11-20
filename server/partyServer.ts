@@ -1,6 +1,6 @@
 import type { Connect, Plugin } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { AccessToken } from "livekit-server-sdk";
+import { issueJoinToken } from "./core";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -59,21 +59,8 @@ export function partyServer(env: Record<string, string>): Plugin {
     if (req.method !== "POST") return send(res, 405, { error: "POST only" });
     try {
       const body = JSON.parse((await readBody(req)) || "{}");
-      const role = body.role === "charuta" ? "charuta" : body.role === "moderator" ? "moderator" : "guest";
-      if (role === "charuta") {
-        if (!pin) return send(res, 500, { error: "No CHARUTA_PIN configured on the server." });
-        if (String(body.pin ?? "").trim() !== pin) return send(res, 401, { error: "That PIN isn't right. Ask the party organiser." });
-      }
-      if (role === "moderator") {
-        if (!modPin) return send(res, 500, { error: "No MODERATOR_PIN configured on the server." });
-        if (!isMod(body.pin)) return send(res, 401, { error: "That moderator PIN isn't right." });
-      }
-      const name = role === "charuta" ? "Charuta" : clean(body.name, 30) || (role === "moderator" ? "Moderator" : "Guest");
-      const id = clean(body.id, 40).replace(/[^a-zA-Z0-9_-]/g, "") || Math.random().toString(36).slice(2, 10);
-      const identity = role === "charuta" ? "charuta" : role === "moderator" ? `mod-${id}` : `g-${id}`;
-      const at = new AccessToken(apiKey, apiSecret, { identity, name, ttl: "12h", metadata: JSON.stringify({ role, question: clean(body.question, 160) }) });
-      at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true, canPublishData: true });
-      send(res, 200, { token: await at.toJwt(), url: publicUrl, identity });
+      const r = await issueJoinToken({ LIVEKIT_API_KEY: apiKey, LIVEKIT_API_SECRET: apiSecret, LIVEKIT_PUBLIC_URL: publicUrl, PARTY_ROOM: roomName, CHARUTA_PIN: pin, MODERATOR_PIN: modPin }, body);
+      send(res, r.status, r.body);
     } catch {
       send(res, 400, { error: "Bad request" });
     }
@@ -97,7 +84,7 @@ export function partyServer(env: Record<string, string>): Plugin {
   function video(req: IncomingMessage, res: ServerResponse, sub: string) {
     const meta = readJson<{ name: string; type: string; size: number; version: number } | null>(videoMeta, null);
     const exists = !!meta && fs.existsSync(videoFile);
-    if (sub === "/info") return send(res, 200, exists ? { exists, ...meta } : { exists: false });
+    if (sub === "/info") return send(res, 200, exists ? { exists, mode: "upload", ...meta } : { exists: false, mode: "upload" });
 
     if (req.method === "PUT") {
       if (!isMod(req.headers["x-mod-pin"])) return send(res, 401, { error: "Moderator PIN required" });

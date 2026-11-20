@@ -1,0 +1,21 @@
+# Netlify: static site + one function for the party API.
+# Set these in Netlify → Site configuration → Environment variables (never in git):
+#   LIVEKIT_PUBLIC_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, CHARUTA_PIN, MODERATOR_PIN
+[build]
+  command = "pnpm build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Charuta's and the moderator's entrances are pages of the same single-page app.
+[[redirects]]
+  from = "/charuta"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/moderator"
+  to = "/index.html"
+  status = 200
