@@ -61,6 +61,7 @@ function startLiveKit() {
   livekit = lk;
 }
 
+if (!env.LIVEKIT_PUBLIC_URL && env.LIVEKIT_URL) env.LIVEKIT_PUBLIC_URL = env.LIVEKIT_URL;
 if (!env.LIVEKIT_PUBLIC_URL) {
   try {
     execSync("command -v livekit-server", { stdio: "ignore" });

@@ -21,7 +21,7 @@ export function partyServer(env: Record<string, string>): Plugin {
   const roomName = env.PARTY_ROOM || "charuta-birthday";
   const pin = env.CHARUTA_PIN || process.env.CHARUTA_PIN || "";
   const modPin = env.MODERATOR_PIN || process.env.MODERATOR_PIN || "";
-  const publicUrl = env.LIVEKIT_PUBLIC_URL || "";
+  const publicUrl = (env.LIVEKIT_PUBLIC_URL || env.LIVEKIT_URL || "").trim();
   const dataDir = path.resolve(env.PARTY_DATA_DIR || "data");
   const actsFile = path.join(dataDir, "challenges.json");
   const videoFile = path.join(dataDir, "finale-video");

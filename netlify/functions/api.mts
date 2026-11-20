@@ -9,7 +9,8 @@ import { clean, cleanVideoUrl, isModeratorPin, issueJoinToken, type PartyEnv } f
 const env = (): PartyEnv => ({
   LIVEKIT_API_KEY: process.env.LIVEKIT_API_KEY,
   LIVEKIT_API_SECRET: process.env.LIVEKIT_API_SECRET,
-  LIVEKIT_PUBLIC_URL: process.env.LIVEKIT_PUBLIC_URL,
+  // LIVEKIT_URL is the name LiveKit's own docs use; accept either.
+  LIVEKIT_PUBLIC_URL: (process.env.LIVEKIT_PUBLIC_URL || process.env.LIVEKIT_URL || "").trim(),
   PARTY_ROOM: process.env.PARTY_ROOM,
   CHARUTA_PIN: process.env.CHARUTA_PIN,
   MODERATOR_PIN: process.env.MODERATOR_PIN,
