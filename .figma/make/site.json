@@ -1,0 +1,10 @@
+{
+  "description": "A playful birthday adventure for Charuta, combining a group video celebration with a 2D game that unlocks friends and brings everyone together for a festive finale.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
