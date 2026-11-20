@@ -1270,12 +1270,12 @@ function drawStation(c: CanvasRenderingContext2D, x: number, used: boolean, next
     c.fillText(used ? "✓ Done!" : "🎭 Charuta's", x, base - 66);
     if (!used) c.fillText("Challenge", x, base - 53);
   } else {
-    c.fillText(used ? "✓ Friend found" : "🎁 Pick a", x, base - 66);
-    if (!used) c.fillText("Friend!", x, base - 53);
+    c.fillText(used ? "✓ Spun!" : "🎡 Spin the", x, base - 66);
+    if (!used) c.fillText("Wheel!", x, base - 53);
   }
   if (next) {
     c.font = `${22 + Math.sin(t * 5) * 2}px serif`;
-    c.fillText(act ? "🎤" : "❓", x, base - 150 + Math.sin(t * 3) * 4);
+    c.fillText(act ? "🎤" : "🎡", x, base - 150 + Math.sin(t * 3) * 4);
   }
 }
 

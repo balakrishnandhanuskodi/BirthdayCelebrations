@@ -43,8 +43,12 @@ export type Phase = "lobby" | "playing" | "movie" | "finale";
 /** A "Pick a Friend" stop in the game. */
 export interface Station {
   n: number;
-  /** pick + spotlight = Friend Station; act = one of the moderator's challenges for Charuta. */
-  stage: "pick" | "spotlight" | "act";
+  /** spin + spotlight = Friend Station (wheel); act = one of the moderator's challenges for Charuta. */
+  stage: "spin" | "spotlight" | "act";
+  /** Set when Charuta presses SPIN: the wheel's names (fixed for the animation) and where it lands. */
+  spin?: { ids: string[]; names: string[]; winner: string };
+  /** Guests skipped at this station (not responding), left off the next spin. */
+  exclude?: string[];
   /** Which challenge (0-4) when stage is "act". */
   act?: number;
   guestId?: string;

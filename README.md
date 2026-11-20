@@ -28,12 +28,12 @@ Three entrances:
 | Charuta | `https://<ip>:5173/charuta` | `CHARUTA_PIN` in `.env.local` |
 | Moderator | `https://<ip>:5173/moderator` | `MODERATOR_PIN` in `.env.local` |
 
-- **Guests (common area):** see and hear each other and watch Charuta's game live. Charuta can't see or hear them until she picks them. They can type a question for her when joining.
+- **Everyone is visible from login:** guests, Charuta and the moderator all see and hear each other. Guests join **muted** (they can unmute anytime) so 40 people don't talk over each other.
 - **11 stops on the route**, alternating **Friend 1 → Challenge 1 → Friend 2 → … → Challenge 5 → Friend 6**:
-  - **Friend Station (6):** the game pauses; Charuta's video plus a face-down card per hidden friend. Charuta clicks a card, a random hidden friend is picked, and both videos go big in the centre with a question. The question is the friend's own, else an unused question another guest typed, else one from `src/realtime/questions.ts`. Other guests are muted; the picked friend gets an Unmute prompt.
+  - **Friend Station (6): Spin the Wheel.** A wheel with the names of everyone not yet spotlighted appears for all. Charuta presses SPIN; it lands on the same person on every screen. Then Charuta's and that friend's videos go big in the centre with a question: the friend's own, else an unused question another guest typed, else one from `src/realtime/questions.ts`. Other guests are muted for the Q&A; the friend gets an Unmute prompt.
   - **Challenge (5):** Charuta alone in the spotlight with one of the moderator's 5 challenges (blank ones use the defaults in `questions.ts`).
-- **Moderator:** the setup panel in their side bar holds the **5 challenges** and the **team video upload**. During the game they press **Done / continue quest** or **Skip** (friend not responding). If no moderator has joined, Charuta gets these buttons.
-- **Party Castle:** if a video was uploaded, it plays full-screen for everyone in sync (Charuta's live reaction in the corner, mics muted). Then everyone not yet picked joins in and the shared finale starts.
+- **Moderator:** the setup panel in their side bar holds the **5 challenges** and the **team video upload**. During the game they press **Done / continue quest** or **Skip & spin again** (friend not responding; they're left off that spin). If no moderator has joined, Charuta gets these buttons.
+- **Party Castle:** if a team video is set, it plays full-screen for everyone in sync (Charuta's live reaction in the corner, mics muted), then the shared finale starts.
 - Saved challenges and the video live in `data/` (kept across restarts).
 - A flower helicopter visits once, after the first friend's Q&A. A plane with a birthday banner flies back and forth across the sky. No points are shown.
 

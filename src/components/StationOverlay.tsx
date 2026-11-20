@@ -1,12 +1,14 @@
 import type { ModCommand, Participant, Station } from "../realtime/types";
 import { VideoTile } from "./VideoTile";
 import { Icon } from "./Icon";
+import { SpinWheel } from "./SpinWheel";
 
 interface Props {
   station: Station;
   charuta?: Participant;
   friend?: Participant;
-  waitingCount: number;
+  /** Names that can still land on the wheel (not yet spotlighted). */
+  wheelNames: string[];
   isCharuta: boolean;
   isModerator: boolean;
   isPickedMe: boolean;
@@ -16,7 +18,7 @@ interface Props {
   speaking: Set<string>;
   micOn: boolean;
   mutedForQA: boolean;
-  onPick: () => void;
+  onSpin: () => void;
   onAnswer: (option: string) => void;
   onCommand: (a: ModCommand) => void;
   onUnmute: () => void;
@@ -24,31 +26,23 @@ interface Props {
 
 /** The in-game "Pick a Friend" window and the Q&A spotlight that follows. */
 export function StationOverlay(props: Props) {
-  const { station, charuta, friend, waitingCount, isCharuta, canControl, speaking } = props;
+  const { station, charuta, friend, wheelNames, isCharuta, canControl, speaking } = props;
 
-  if (station.stage === "pick") {
-    const cards = Math.min(waitingCount, 40);
+  if (station.stage === "spin") {
+    const spin = station.spin ? { names: station.spin.names, winnerIndex: Math.max(0, station.spin.ids.indexOf(station.spin.winner)), key: `${station.n}-${station.spin.winner}-${station.spin.ids.length}` } : undefined;
     return (
-      <div className="station-overlay" role="dialog" aria-label="Pick a friend">
+      <div className="station-overlay" role="dialog" aria-label="Spin the wheel">
         <div className="station-card">
-          <div className="surprise-tag">
-            🎁 {station.n >= 0 ? `Friend Station ${station.n + 1}` : "Bonus Friend Station"}
-          </div>
+          <div className="surprise-tag">🎡 Friend Station {station.n >= 0 ? Math.floor(station.n / 2) + 1 : ""} of 6 · Spin the Wheel</div>
           <div className="pick-layout">
             <div className="pick-charuta">{charuta && <VideoTile p={charuta} variant="stage" speaking={speaking.has(charuta.id)} />}</div>
             <div className="pick-deck">
-              <h2>{isCharuta ? "Pick a card to find a friend!" : "Charuta is picking a friend…"}</h2>
-              <p>{waitingCount} {waitingCount === 1 ? "friend is" : "friends are"} hiding behind these cards</p>
-              <div className={`deck ${cards > 24 ? "tiny" : cards > 12 ? "small" : ""}`}>
-                {Array.from({ length: cards }).map((_, i) => (
-                  <button key={i} className="deck-card" disabled={!isCharuta} onClick={props.onPick} style={{ animationDelay: `${(i % 12) * 0.05}s` }} aria-label="Pick this card">
-                    <span>?</span>
-                  </button>
-                ))}
-              </div>
+              <h2>{spin ? "Spinning…" : isCharuta ? "Spin the wheel to pick a friend!" : "Charuta is about to spin…"}</h2>
+              <p>{(spin?.names.length ?? wheelNames.length)} friends on the wheel. Whoever it lands on asks Charuta a question!</p>
+              <SpinWheel names={wheelNames} spin={spin} canSpin={isCharuta} onSpin={props.onSpin} />
             </div>
           </div>
-          {canControl && (
+          {canControl && !spin && (
             <div className="mod-controls">
               <button className="ghost" onClick={() => props.onCommand("close")}>
                 Skip this station
@@ -102,7 +96,7 @@ export function StationOverlay(props: Props) {
       ))}
       <div className="spot-wrap" key={station.guestId}>
         <div className="surprise-tag">
-          <Icon name="sparkle" size={14} /> Surprise! Friend found
+          <Icon name="sparkle" size={14} /> The wheel picked {friend?.name ?? "a friend"}!
         </div>
         <div className="spot-stage">
           <figure className="spot-person">
@@ -149,7 +143,7 @@ export function StationOverlay(props: Props) {
               ✅ Q&A done, continue quest
             </button>
             <button className="ghost" onClick={() => props.onCommand("skip")}>
-              ⏭ Skip (not responding)
+              ⏭ Skip & spin again (not responding)
             </button>
           </div>
         ) : (

@@ -10,6 +10,7 @@ import { Icon } from "./Icon";
 import { RemoteAudio, VideoTile } from "./VideoTile";
 import { Finale } from "./Finale";
 import { StationOverlay } from "./StationOverlay";
+import { SPIN_MS } from "./SpinWheel";
 import { MoviePlayer } from "./MoviePlayer";
 import { ModeratorSetup } from "./ModeratorSetup";
 
@@ -57,8 +58,10 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
   const hasModerator = moderators.length > 0;
   const guests = participants.filter((p) => !p.isCharuta && !p.isModerator);
   const otherGuests = guests.filter((p) => !p.isLocal);
-  const revealedGuests = guests.filter((p) => p.status === "revealed");
-  const waitingGuests = guests.filter((p) => p.status === "waiting").sort((a, b) => a.joinedAt - b.joinedAt);
+  // `party.revealed` = guests who already had their spotlight turn.
+  const spotlighted = guests.filter((p) => party.revealed.includes(p.id));
+  const onWheel = guests.filter((p) => !party.revealed.includes(p.id) && !(party.station?.exclude ?? []).includes(p.id)).sort((a, b) => a.joinedAt - b.joinedAt);
+  const SPOTLIGHTS = 6;
   const speaking = new Set(live.speakers);
   const station = party.phase !== "finale" ? party.station : null;
   const friend = station?.guestId ? participants.find((p) => p.id === station.guestId) : undefined;
@@ -143,22 +146,37 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
         actions.setParty({ station: { n, stage: "act", act: idx, question: text } });
         return;
       }
-      if (!guestsRef.current.some((p) => p.status === "waiting")) {
-        showToast("Everyone's already found! Run to the Party Castle 🏰");
+      if (!guestsRef.current.some((p) => !partyRef.current.revealed.includes(p.id))) {
+        showToast("Everyone has had a turn! Run to the Party Castle 🏰");
         return;
       }
-      actions.setParty({ station: { n, stage: "pick" } });
+      actions.setParty({ station: { n, stage: "spin" } });
     },
     [isCharuta, actions, showToast],
   );
 
-  /** Charuta clicked a card: pick a random hidden friend and a question. */
-  const pickFriend = () => {
+  /** Charuta pressed SPIN: freeze the wheel's names and choose where it lands. */
+  const spinWheel = () => {
     const s = partyRef.current;
-    if (!isCharuta || !s.station) return;
-    const waiting = guestsRef.current.filter((p) => p.status === "waiting");
-    if (!waiting.length) return;
-    const g = pick(waiting);
+    if (!isCharuta || !s.station || s.station.stage !== "spin" || s.station.spin) return;
+    const exclude = s.station.exclude ?? [];
+    const candidates = guestsRef.current.filter((p) => !s.revealed.includes(p.id) && !exclude.includes(p.id)).sort((a, b) => a.joinedAt - b.joinedAt);
+    if (!candidates.length) return;
+    const winner = pick(candidates);
+    actions.setParty({ station: { ...s.station, spin: { ids: candidates.map((p) => p.id), names: candidates.map((p) => p.name), winner: winner.id } } });
+  };
+
+  /** After the wheel stops: the winner goes into the spotlight with a question. */
+  const landWheel = useCallback(() => {
+    const s = partyRef.current;
+    const st = s.station;
+    if (!isCharuta || !st || st.stage !== "spin" || !st.spin) return;
+    const g = guestsRef.current.find((p) => p.id === st.spin!.winner);
+    if (!g) {
+      // They left mid-spin: spin again.
+      actions.setParty({ station: { n: st.n, stage: "spin", exclude: st.exclude } });
+      return;
+    }
     let question: string;
     let options: string[] = [];
     let usedQ = s.usedQ;
@@ -180,23 +198,23 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
       usedQ = avail.length ? [...usedQ, qi] : [qi];
     }
     actions.setParty({
-      station: { n: s.station.n, stage: "spotlight", guestId: g.id, question, options },
+      station: { n: st.n, stage: "spotlight", guestId: g.id, question, options },
       revealed: [...new Set([...s.revealed, g.id])],
       usedQ,
       usedAsk,
     });
-  };
+  }, [isCharuta, actions]);
 
-  /** Everyone not yet found joins in, and the shared finale starts. */
+  // Charuta's browser moves on once the wheel has stopped spinning on every screen.
+  useEffect(() => {
+    if (!isCharuta || party.station?.stage !== "spin" || !party.station.spin) return;
+    const t = setTimeout(landWheel, SPIN_MS + 900);
+    return () => clearTimeout(t);
+  }, [isCharuta, party.station?.stage, party.station?.spin?.winner, landWheel]);
+
+  /** The shared finale starts (everyone is already on screen). */
   const goToFinale = useCallback(() => {
     if (!isCharuta) return;
-    const waiting = guestsRef.current.filter((p) => p.status === "waiting");
-    setCastleGuests(waiting.map((g) => g.name));
-    if (waiting.length)
-      actions.reveal(
-        waiting.map((p) => p.id),
-        "Waiting for you at the Party Castle!",
-      );
     actions.clearReveals();
     actions.setParty({ phase: "finale", station: null });
   }, [isCharuta, actions]);
@@ -221,12 +239,10 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
       const st: Station | null = s.station;
       if (a === "finale") return s.phase === "movie" ? goToFinale() : goToCastle();
       if (!st) return;
-      const waitingLeft = guestsRef.current.filter((p) => p.status === "waiting" && p.id !== st.guestId).length;
       if (a === "close") actions.setParty({ station: null, heliDone: s.heliDone || st.stage === "spotlight" });
-      if (a === "another") actions.setParty({ station: waitingLeft > 0 ? { n: st.n, stage: "pick" } : null, heliDone: true });
       if (a === "skip" && st.guestId) {
-        // Put them back in the deck and pick again.
-        actions.setParty({ revealed: s.revealed.filter((id) => id !== st.guestId), station: { n: st.n, stage: "pick" } });
+        // Not responding: they don't count as spotlighted, and the next spin leaves them off.
+        actions.setParty({ revealed: s.revealed.filter((id) => id !== st.guestId), station: { n: st.n, stage: "spin", exclude: [...(st.exclude ?? []), st.guestId] } });
       }
     },
     [actions, goToFinale, goToCastle],
@@ -414,7 +430,8 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
   }
 
   const totalGuests = guests.length;
-  const revealPct = totalGuests ? Math.round((revealedGuests.length / totalGuests) * 100) : 0;
+  const spotTotal = Math.min(SPOTLIGHTS, totalGuests) || SPOTLIGHTS;
+  const revealPct = Math.round((Math.min(spotlighted.length, spotTotal) / spotTotal) * 100);
 
   return (
     <main className="room-screen" ref={shellRef}>
@@ -433,9 +450,9 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
         </div>
         <div className="quest-progress">
           <div>
-            <span>Friends discovered</span>
+            <span>Friends spotlighted</span>
             <b>
-              {revealedGuests.length} / {totalGuests}
+              {Math.min(spotlighted.length, spotTotal)} / {spotTotal}
             </b>
           </div>
           <div className="progress-track">
@@ -541,11 +558,11 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
               <div className="quest-label">Charuta's</div>
               <h2>Birthday Quest</h2>
               <p>
-                {waitingGuests.length > 0 ? (
+                {guests.length > 0 ? (
                   <>
-                    <b>{waitingGuests.length}</b> {waitingGuests.length === 1 ? "friend is" : "friends are"} hiding somewhere in this room…
+                    <b>{guests.length}</b> {guests.length === 1 ? "friend is" : "friends are"} here to celebrate you!
                     <br />
-                    Stop at each 🎁 Friend Station, pick a card and meet a friend!
+                    At each 🎡 Friend Station, spin the wheel and a friend asks you a question.
                   </>
                 ) : (
                   <>
@@ -558,7 +575,7 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
               <ul className="quest-legend">
                 <li>🌳 Jump bushes</li>
                 <li>⭐ Grab stars</li>
-                <li>🎁 Friend Stations</li>
+                <li>🎡 Spin the wheel</li>
                 <li>🔥 Dodge flames</li>
                 <li>🏰 Reach the castle</li>
               </ul>
@@ -573,23 +590,23 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
           {!isCharuta && !party.started && (
             <div className="game-start-overlay spectator-wait">
               <div className="quest-emblem">
-                <span>{charuta ? "👑" : "🤫"}</span>
+                <span>{charuta ? "👑" : "🎈"}</span>
               </div>
-              <h2>{charuta ? "Charuta is here!" : "Shh… Charuta hasn't arrived yet"}</h2>
+              <h2>{charuta ? "Charuta is here!" : "Charuta hasn't arrived yet"}</h2>
               <p>
                 {isModerator
-                  ? "You're the moderator. When Charuta stops at a Friend Station and picks a friend, you'll end each Q&A so she can continue."
+                  ? "You're the moderator. When the wheel picks a friend at each Friend Station, you'll end the Q&A so Charuta can continue."
                   : charuta
-                    ? "She's about to start her quest. Keep quiet: she can't see or hear you until she picks your card!"
-                    : "When she joins and starts her quest, you'll watch her play live right here. At each Friend Station she picks a card, and it might be you!"}
+                    ? "She's about to start her quest. Wave hello! At each Friend Station she spins a wheel, and it might land on you."
+                    : "When she joins and starts her quest, you'll watch her play live right here. At each Friend Station she spins a wheel of everyone's names!"}
               </p>
               <ul className="quest-legend">
                 <li>👀 Watch her play</li>
-                <li>🎴 Get picked</li>
+                <li>🎡 Get spun</li>
                 <li>❓ Ask her a question</li>
               </ul>
               <small>
-                {otherGuests.length} other {otherGuests.length === 1 ? "guest is" : "guests are"} hiding
+                {otherGuests.length} other {otherGuests.length === 1 ? "guest is" : "guests are"} here · you joined muted, unmute anytime
               </small>
             </div>
           )}
@@ -611,7 +628,7 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
               station={station}
               charuta={charuta}
               friend={friend}
-              waitingCount={waitingGuests.length}
+              wheelNames={onWheel.map((p) => p.name)}
               isCharuta={isCharuta}
               isModerator={isModerator}
               isPickedMe={isPickedMe}
@@ -620,7 +637,7 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
               speaking={speaking}
               micOn={live.micOn}
               mutedForQA={mutedForQA}
-              onPick={pickFriend}
+              onSpin={spinWheel}
               onAnswer={(o) => isCharuta && station && actions.setParty({ station: { ...station, answer: o } })}
               onCommand={control}
               onUnmute={() => actions.setMic(true)}
@@ -650,12 +667,12 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
           </div>
 
           {!isCharuta && (
-            <div className={`status-pill ${me.status === "revealed" && !isModerator ? "found" : ""}`}>
+            <div className={`status-pill ${party.revealed.includes(me.id) ? "found" : ""}`}>
               {isModerator
-                ? "🎙️ You're the moderator. Charuta can see and hear you."
-                : me.status === "revealed"
-                  ? "🎉 Charuta found you! She can see and hear you now."
-                  : "🤫 You're hidden. Charuta can't see or hear you until she picks your card."}
+                ? "🎙️ You're the moderator. Everyone can see and hear you."
+                : party.revealed.includes(me.id)
+                  ? "⭐ You had your turn in the spotlight!"
+                  : "🎡 You're on the wheel! If it lands on you, unmute and ask Charuta a question."}
             </div>
           )}
 
@@ -693,59 +710,21 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
             </>
           )}
 
-          {isCharuta ? (
-            <>
-              <div className="gallery-title">
-                <span>Friends you found</span>
-                <small>
-                  {revealedGuests.length} of {totalGuests}
-                </small>
-              </div>
-              {revealedGuests.length === 0 && <p className="empty-note">No one yet. Run to a 🎁 Friend Station!</p>}
-              <div className="guest-grid">
-                {revealedGuests
-                  .slice()
-                  .sort((a, b) => (newIds[b.id] ?? 0) - (newIds[a.id] ?? 0))
-                  .map((g) => (
-                    <VideoTile key={g.id} p={g} speaking={speaking.has(g.id)} isNew={!!newIds[g.id]} reaction={tileReactions[g.id]} />
-                  ))}
-              </div>
-              {waitingGuests.length > 0 && (
-                <div className="mystery-crowd">
-                  <div className="gallery-title">
-                    <span>Hiding in the room</span>
-                    <small>{waitingGuests.length} mystery guests</small>
-                  </div>
-                  <div className="mystery-bubbles">
-                    {waitingGuests.slice(0, 60).map((g) => (
-                      <i key={g.id} className={tileReactions[g.id] ? "cheering" : ""}>
-                        ?
-                      </i>
-                    ))}
-                  </div>
-                  <small>Each 🎁 Friend Station lets you pick one of them!</small>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="gallery-title">
-                <span>Everyone here</span>
-                <small>
-                  {revealedGuests.length} of {totalGuests} found
-                </small>
-              </div>
-              {otherGuests.length === 0 && <p className="empty-note">No other guests yet. Others will appear as they join.</p>}
-              <div className="guest-grid">
-                {otherGuests
-                  .slice()
-                  .sort((a, b) => (a.status === b.status ? a.joinedAt - b.joinedAt : a.status === "revealed" ? -1 : 1))
-                  .map((g) => (
-                    <VideoTile key={g.id} p={{ ...g, status: "revealed" }} hiddenFromCharuta={g.status === "waiting"} speaking={speaking.has(g.id)} isNew={!!newIds[g.id]} reaction={tileReactions[g.id]} />
-                  ))}
-              </div>
-            </>
-          )}
+          <div className="gallery-title">
+            <span>{isCharuta ? "Your friends here" : "Everyone here"}</span>
+            <small>
+              {guests.length} {guests.length === 1 ? "guest" : "guests"} · ⭐ {spotlighted.length} spotlighted
+            </small>
+          </div>
+          {otherGuests.length === 0 && <p className="empty-note">{isCharuta ? "Your friends will appear here as they join." : "No other guests yet. Others will appear as they join."}</p>}
+          <div className="guest-grid">
+            {otherGuests
+              .slice()
+              .sort((a, b) => (newIds[b.id] ?? 0) - (newIds[a.id] ?? 0) || a.joinedAt - b.joinedAt)
+              .map((g) => (
+                <VideoTile key={g.id} p={g} spotlighted={party.revealed.includes(g.id)} speaking={speaking.has(g.id)} isNew={!!newIds[g.id]} reaction={tileReactions[g.id]} />
+              ))}
+          </div>
 
           {chatOpen && <ChatDrawer live={live} meId={me.id} onClose={() => setChatOpen(false)} />}
         </aside>

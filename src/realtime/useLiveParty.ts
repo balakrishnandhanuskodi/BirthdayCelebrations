@@ -110,7 +110,6 @@ export function useLiveParty(join: JoinInfo) {
   const nameOf = useCallback(
     (identity: string, fallback?: string) => {
       // On Charuta's screen, guests stay anonymous until revealed.
-      if (isCharuta && identity !== "charuta" && !identity.startsWith("mod-") && identity !== room.localParticipant.identity && !partyRef.current.revealed.includes(identity) && partyRef.current.phase !== "finale") return "A mystery guest";
       return fallback || "Someone";
     },
     [isCharuta, room],
@@ -201,7 +200,7 @@ export function useLiveParty(join: JoinInfo) {
 
     let cancelled = false;
     room
-      .connect(url, join.token, { autoSubscribe: !isCharuta })
+      .connect(url, join.token, { autoSubscribe: true })
       .then(async () => {
         if (cancelled) return;
         setConn("connected");
@@ -211,9 +210,11 @@ export function useLiveParty(join: JoinInfo) {
         else send({ t: "hello" });
         try {
           await room.localParticipant.enableCameraAndMicrophone();
+          // Guests start muted so 40 people don't talk at once; they unmute when it's their turn.
+          if (join.role === "guest") await room.localParticipant.setMicrophoneEnabled(false);
         } catch {
           try {
-            await room.localParticipant.setMicrophoneEnabled(true);
+            await room.localParticipant.setMicrophoneEnabled(join.role !== "guest");
             setMediaError("Camera unavailable: showing your avatar instead.");
           } catch {
             setMediaError("Camera and mic are blocked. Allow them in your browser's site settings.");
@@ -250,19 +251,6 @@ export function useLiveParty(join: JoinInfo) {
     return () => clearInterval(t);
   }, [isCharuta, broadcastState]);
 
-  // Charuta only receives video/audio from guests she has discovered. Keeps the surprise
-  // (and saves a lot of bandwidth with 40 people).
-  useEffect(() => {
-    if (!isCharuta || conn !== "connected") return;
-    const all = party.phase === "finale";
-    room.remoteParticipants.forEach((p) => {
-      const allowed = all || p.identity === "charuta" || p.identity.startsWith("mod-") || party.revealed.includes(p.identity);
-      p.trackPublications.forEach((pub) => {
-        if (pub.isSubscribed !== allowed) pub.setSubscribed(allowed);
-      });
-    });
-  }, [isCharuta, conn, party, version, room]);
-
   const participants: Participant[] = useMemo(() => {
     if (conn === "connecting" || conn === "failed") return [];
     const revealed = new Set(party.revealed);
@@ -279,7 +267,8 @@ export function useLiveParty(join: JoinInfo) {
         isCharuta: isCh,
         isModerator: isMod,
         isLocal: lk === room.localParticipant,
-        status: isCh || isMod || revealed.has(lk.identity) || party.phase === "finale" ? "revealed" : "waiting",
+        // Everyone is visible from the moment they join; `revealed` now means "had a spotlight turn".
+        status: "revealed",
         micOn: !!mic && !mic.isMuted,
         camOn: !!cam && !cam.isMuted,
         noCamera: !cam,

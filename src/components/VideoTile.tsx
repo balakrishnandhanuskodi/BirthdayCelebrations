@@ -65,15 +65,15 @@ export const initials = (name: string) =>
 interface TileProps {
   p: Participant;
   speaking?: boolean;
-  /** Guest view: this person is still hidden from Charuta. */
-  hiddenFromCharuta?: boolean;
+  /** Already had their turn in the spotlight. */
+  spotlighted?: boolean;
   variant?: "hero" | "grid" | "reveal" | "finale" | "self" | "stage" | "pip";
   isNew?: boolean;
   reaction?: { emoji: string; key: number } | null;
   mysteryNumber?: number;
 }
 
-export function VideoTile({ p, speaking, variant = "grid", isNew, reaction, mysteryNumber, hiddenFromCharuta }: TileProps) {
+export function VideoTile({ p, speaking, variant = "grid", isNew, reaction, mysteryNumber, spotlighted }: TileProps) {
   const locked = p.status === "waiting";
   const hasLiveCam = p.camOn && p.video;
 
@@ -125,7 +125,7 @@ export function VideoTile({ p, speaking, variant = "grid", isNew, reaction, myst
         </>
       )}
       {locked && <span className="tile-lock-pill">Waiting</span>}
-      {hiddenFromCharuta && !locked && <span className="tile-hidden-pill">🤫 Hidden</span>}
+      {spotlighted && !isNew && <span className="tile-hidden-pill star">⭐</span>}
       {p.isModerator && <span className="tile-hidden-pill mod">🎙️ Moderator</span>}
       {isNew && <span className="tile-new-pill">Just revealed!</span>}
       {reaction && (

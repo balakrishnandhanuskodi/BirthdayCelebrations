@@ -70,6 +70,7 @@ function safe(fn: () => void) {
 export const sfx = {
   jump: () => safe(() => tone(330, 0, 0.16, "square", 0.035, 620)),
   star: () => safe(() => { tone(988, 0, 0.08, "square", 0.04); tone(1319, 0.07, 0.22, "square", 0.04); }),
+  tick: () => safe(() => tone(1400, 0, 0.03, "square", 0.025)),
   bump: () => safe(() => tone(180, 0, 0.12, "square", 0.05, 120)),
   hurt: () => safe(() => tone(420, 0, 0.3, "sawtooth", 0.04, 140)),
   pop: () => safe(() => tone(600, 0, 0.12, "sine", 0.08, 1200)),
