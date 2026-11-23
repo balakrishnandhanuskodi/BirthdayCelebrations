@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_ACTS } from "../realtime/questions";
+import { formatOpening } from "../lib/useSchedule";
 
 const modPin = () => {
   try {
@@ -30,12 +31,22 @@ export function ModeratorSetup() {
   const [videoError, setVideoError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [link, setLink] = useState("");
+  const [opensAt, setOpensAt] = useState<string | null>(null);
+  const [opensInput, setOpensInput] = useState("");
+  const [schedMsg, setSchedMsg] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
 
   useEffect(() => {
     fetch("/api/acts")
       .then((r) => r.json())
       .then((d) => setActs([0, 1, 2, 3, 4].map((i) => d.acts?.[i] ?? "")))
+      .catch(() => {});
+    fetch("/api/schedule")
+      .then((r) => r.json())
+      .then((d) => {
+        setOpensAt(d.opensAt ?? null);
+        setOpensInput(d.opensAt ? toLocalInput(d.opensAt) : "");
+      })
       .catch(() => {});
     fetch("/api/video/info")
       .then((r) => r.json())
@@ -98,6 +109,19 @@ export function ModeratorSetup() {
     }
   };
 
+  const saveSchedule = async (value: string | null) => {
+    setSchedMsg("");
+    try {
+      const r = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: modPin(), opensAt: value === null ? null : new Date(value).toISOString() }) });
+      const d = await r.json();
+      if (!r.ok) return setSchedMsg(d.error || "Couldn't save");
+      setOpensAt(d.opensAt ?? null);
+      setSchedMsg(d.opensAt ? "✓ Saved" : "✓ Sign-in is open now");
+    } catch {
+      setSchedMsg("Couldn't save");
+    }
+  };
+
   const removeVideo = async () => {
     await fetch("/api/video", { method: "DELETE", headers: { "x-mod-pin": modPin(), "Content-Type": "application/json" }, body: JSON.stringify({ pin: modPin() }) }).catch(() => {});
     setVideo((v) => ({ exists: false, mode: v.mode }));
@@ -111,6 +135,22 @@ export function ModeratorSetup() {
       </button>
       {open && (
         <>
+          <div className="mod-section">
+            <b>⏰ Party opening time</b>
+            <small>Guests see a countdown until then; sign-in opens automatically. Charuta and moderators can always log in.</small>
+            <div className="sched-now">{opensAt && Date.parse(opensAt) > Date.now() ? <>🔒 Opens {formatOpening(opensAt)}</> : <>✅ Sign-in is open</>}</div>
+            <input className="sched-input" type="datetime-local" value={opensInput} onChange={(e) => setOpensInput(e.target.value)} />
+            <div className="sched-buttons">
+              <button className="mod-save" onClick={() => opensInput && saveSchedule(opensInput)} disabled={!opensInput}>
+                Save opening time
+              </button>
+              <button className="mod-save ghost" onClick={() => saveSchedule(null)}>
+                Open now
+              </button>
+            </div>
+            {schedMsg && <small className={schedMsg.startsWith("✓") ? "ok" : "err"}>{schedMsg}</small>}
+          </div>
+
           <div className="mod-section">
             <b>🎭 Charuta's 5 challenges</b>
             <small>Shown between the friend reveals (Friend 1 → Challenge 1 → Friend 2 …). Leave blank to use the suggestion.</small>
@@ -188,4 +228,11 @@ export function ModeratorSetup() {
       )}
     </div>
   );
+}
+
+/** ISO time → value for <input type="datetime-local"> in this device's time zone. */
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

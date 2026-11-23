@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "./Icon";
 import { BirthdayPlane } from "./BirthdayPlane";
 import { unlockAudio } from "../lib/audio";
+import { formatOpening, useSchedule } from "../lib/useSchedule";
 
 export function FloatingDecor({ count = 18 }: { count?: number }) {
   return (
@@ -61,10 +62,38 @@ export interface JoinRequest {
   pin?: string;
 }
 
+/** Shown to guests before the party opens. Switches to the join form by itself at the start time. */
+function Countdown({ msLeft, opensAt }: { msLeft: number; opensAt: string | null }) {
+  const s = Math.floor(msLeft / 1000);
+  const parts = [
+    { v: Math.floor(s / 86400), l: "days" },
+    { v: Math.floor((s % 86400) / 3600), l: "hours" },
+    { v: Math.floor((s % 3600) / 60), l: "minutes" },
+    { v: s % 60, l: "seconds" },
+  ].filter((p, i) => i > 0 || p.v > 0);
+  return (
+    <div className="name-card countdown-card">
+      <div className="countdown-kicker">🎉 The party opens in</div>
+      <div className="countdown">
+        {parts.map((p) => (
+          <div key={p.l}>
+            <b>{String(p.v).padStart(2, "0")}</b>
+            <small>{p.l}</small>
+          </div>
+        ))}
+      </div>
+      <p className="countdown-when">{formatOpening(opensAt)}</p>
+      <p className="countdown-note">Keep this page open: the sign-in appears here automatically at the start time. 🎈</p>
+    </div>
+  );
+}
+
 /** The common entrance every guest uses. */
 export function Welcome({ onJoin, busy, error }: { onJoin: (r: JoinRequest) => void; busy: boolean; error: string }) {
   const [name, setName] = useState(() => localStorage.getItem("party-name") ?? "");
   const [question, setQuestion] = useState("");
+  const schedule = useSchedule();
+  const waiting = schedule.loaded && !schedule.isOpen;
   const start = () => {
     unlockAudio();
     if (!name.trim()) return;
@@ -88,6 +117,9 @@ export function Welcome({ onJoin, busy, error }: { onJoin: (r: JoinRequest) => v
           <em>Charuta!</em>
         </h1>
         <p>An Adventure Full of Surprises Awaits You!</p>
+        {waiting ? (
+          <Countdown msLeft={schedule.msLeft} opensAt={schedule.opensAt} />
+        ) : (
         <form
           className="name-card"
           onSubmit={(e) => {
@@ -117,6 +149,7 @@ export function Welcome({ onJoin, busy, error }: { onJoin: (r: JoinRequest) => v
             or join as a guest <Icon name="arrow" size={14} />
           </button>
         </form>
+        )}
         <p className="device-note">Allow camera & microphone when asked. Use headphones if you can.</p>
       </section>
       <GamePreview />

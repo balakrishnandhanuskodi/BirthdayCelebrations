@@ -1,5 +1,5 @@
 import { getStore } from "@netlify/blobs";
-import { clean, cleanVideoUrl, isModeratorPin, issueJoinToken, type PartyEnv } from "../../server/core";
+import { clean, cleanOpensAt, cleanVideoUrl, isModeratorPin, issueJoinToken, joinBlockedUntil, resolveOpensAt, type PartyEnv } from "../../server/core";
 
 /**
  * Netlify version of the party backend (same API as `pnpm party`):
@@ -34,8 +34,26 @@ export default async (req: Request) => {
 
   if (path === "/join") {
     if (req.method !== "POST") return json(405, { error: "POST only" });
-    const r = await issueJoinToken(e, await readJson(req), true);
+    const body = await readJson(req);
+    const opensAt = resolveOpensAt((await store.get("schedule", { type: "json" })) as { opensAt: string | null } | null);
+    const blocked = joinBlockedUntil(body.role, opensAt);
+    if (blocked) return json(blocked.status, blocked.body);
+    const r = await issueJoinToken(e, body, true);
     return json(r.status, r.body);
+  }
+
+  if (path === "/schedule") {
+    if (req.method === "GET") {
+      const opensAt = resolveOpensAt((await store.get("schedule", { type: "json" })) as { opensAt: string | null } | null);
+      return json(200, { opensAt, now: Date.now() });
+    }
+    if (req.method !== "POST") return json(405, { error: "GET or POST" });
+    const body = await readJson(req);
+    if (!isModeratorPin(e, body.pin)) return json(401, { error: "Moderator PIN required" });
+    const opensAt = cleanOpensAt(body.opensAt);
+    if (opensAt === undefined) return json(400, { error: "Please pick a valid date and time." });
+    await store.setJSON("schedule", { opensAt });
+    return json(200, { opensAt, now: Date.now() });
   }
 
   if (path === "/acts") {

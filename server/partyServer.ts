@@ -1,6 +1,6 @@
 import type { Connect, Plugin } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { issueJoinToken } from "./core";
+import { cleanOpensAt, issueJoinToken, joinBlockedUntil, resolveOpensAt } from "./core";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -26,6 +26,7 @@ export function partyServer(env: Record<string, string>): Plugin {
   const actsFile = path.join(dataDir, "challenges.json");
   const videoFile = path.join(dataDir, "finale-video");
   const videoMeta = path.join(dataDir, "finale-video.json");
+  const scheduleFile = path.join(dataDir, "schedule.json");
   const MAX_VIDEO = 2 * 1024 * 1024 * 1024;
 
   const clean = (s: unknown, max: number) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, max);
@@ -59,8 +60,26 @@ export function partyServer(env: Record<string, string>): Plugin {
     if (req.method !== "POST") return send(res, 405, { error: "POST only" });
     try {
       const body = JSON.parse((await readBody(req)) || "{}");
+      const blocked = joinBlockedUntil(body.role, resolveOpensAt(readJson<{ opensAt: string | null } | null>(scheduleFile, null)));
+      if (blocked) return send(res, blocked.status, blocked.body);
       const r = await issueJoinToken({ LIVEKIT_API_KEY: apiKey, LIVEKIT_API_SECRET: apiSecret, LIVEKIT_PUBLIC_URL: publicUrl, PARTY_ROOM: roomName, CHARUTA_PIN: pin, MODERATOR_PIN: modPin }, body);
       send(res, r.status, r.body);
+    } catch {
+      send(res, 400, { error: "Bad request" });
+    }
+  }
+
+  async function schedule(req: IncomingMessage, res: ServerResponse) {
+    if (req.method === "GET") return send(res, 200, { opensAt: resolveOpensAt(readJson<{ opensAt: string | null } | null>(scheduleFile, null)), now: Date.now() });
+    if (req.method !== "POST") return send(res, 405, { error: "GET or POST" });
+    try {
+      const body = JSON.parse((await readBody(req)) || "{}");
+      if (!isMod(body.pin)) return send(res, 401, { error: "Moderator PIN required" });
+      const opensAt = cleanOpensAt(body.opensAt);
+      if (opensAt === undefined) return send(res, 400, { error: "Please pick a valid date and time." });
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(scheduleFile, JSON.stringify({ opensAt }));
+      send(res, 200, { opensAt, now: Date.now() });
     } catch {
       send(res, 400, { error: "Bad request" });
     }
@@ -150,6 +169,7 @@ export function partyServer(env: Record<string, string>): Plugin {
     const url = (req.url || "").split("?")[0];
     if (url === "/api/join") return void join(req, res);
     if (url === "/api/acts") return void acts(req, res);
+    if (url === "/api/schedule") return void schedule(req, res);
     if (url === "/api/video" || url === "/api/video/info") return video(req, res, url.slice("/api/video".length));
     next();
   };

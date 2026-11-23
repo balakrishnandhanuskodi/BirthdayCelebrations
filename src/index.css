@@ -496,6 +496,12 @@
 .video-file em { color: #8e8499; font-style: normal; }
 .video-file div { display: flex; gap: 6px; }
 .video-file a, .video-file button { border: 1px solid #e0d8ea; background: #fff; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: #4a36b5; text-decoration: none; }
+.sched-now { font-size: 13px; font-weight: 700; color: #3a2b64; background: #fff; border: 1px solid #e6dff2; border-radius: 9px; padding: 7px 9px; }
+.sched-input { border: 1px solid #e0d8ea; border-radius: 9px; padding: 7px 9px; font-size: 13px; background: #fff; }
+.sched-buttons { display: flex; gap: 6px; }
+.sched-buttons .mod-save { flex: 1; }
+.mod-save.ghost { background: #f1eef5; color: #4a36b5; }
+.mod-section .ok { color: #2f7a45; font-weight: 700; }
 .video-link { display: flex; flex-direction: column; gap: 6px; }
 .video-link input { border: 1px solid #e0d8ea; border-radius: 9px; padding: 8px 9px; font-size: 12px; outline: none; }
 .upload-bar { position: relative; height: 22px; border-radius: 11px; background: #ece6f7; overflow: hidden; }
@@ -531,6 +537,17 @@
 .wheel-name { margin-top: 10px; min-height: 34px; padding: 4px 16px; border-radius: 20px; background: #f1ecfb; color: #6f6386; font: 600 16px "Fredoka", sans-serif; text-align: center; }
 .wheel-name.on { background: #3a2b64; color: #ffe27a; font-size: 20px; }
 .tile-hidden-pill.star { background: rgba(255,216,77,.92); color: #4a3570; }
+
+/* ===== Countdown before the party opens ===== */
+.countdown-card { text-align: center; }
+.countdown-kicker { font: 600 18px "Fredoka", sans-serif; color: #6b3fa0; }
+.countdown { display: flex; justify-content: center; gap: 10px; margin: 14px 0 10px; }
+.countdown div { min-width: 70px; padding: 10px 6px 8px; border-radius: 14px; background: linear-gradient(160deg,#6a50db,#9a6cf0); color: #fff; box-shadow: 0 8px 18px rgba(94,70,199,.28); }
+.countdown b { display: block; font: 700 32px/1 "Fredoka", sans-serif; }
+.countdown small { display: block; margin-top: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; opacity: .85; }
+.countdown-when { margin: 4px 0 !important; font: 600 15px "DM Sans", sans-serif !important; color: #3a2b64 !important; }
+.countdown-note { margin: 6px 0 0 !important; font: 500 13px "DM Sans", sans-serif !important; color: #8a7f96 !important; }
+@media (max-width: 650px) { .countdown div { min-width: 58px; } .countdown b { font-size: 26px; } }
 
 /* ===== Keyframes ===== */
 @keyframes feedIn { from { opacity: 0; transform: translateX(-30px) scale(.9); } }

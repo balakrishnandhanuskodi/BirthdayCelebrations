@@ -65,3 +65,28 @@ export function cleanVideoUrl(u: unknown) {
     return "";
   }
 }
+
+/* ---------------------------- opening time ---------------------------- */
+
+/** Used until the moderator sets something else: 24 Nov 2026, 11:00 AM India time. */
+export const DEFAULT_OPENS_AT = "2026-11-24T11:00:00+05:30";
+
+/** Stored value: { opensAt: ISO string } or { opensAt: null } meaning "open now". Nothing stored → default. */
+export function resolveOpensAt(stored: { opensAt: string | null } | null | undefined): string | null {
+  if (stored && "opensAt" in stored) return stored.opensAt;
+  return DEFAULT_OPENS_AT;
+}
+
+export function cleanOpensAt(v: unknown): string | null | undefined {
+  if (v === null) return null;
+  const t = Date.parse(String(v ?? ""));
+  return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
+}
+
+/** Guests can't sign in before the opening time; Charuta and the moderator always can. */
+export function joinBlockedUntil(role: unknown, opensAt: string | null, now = Date.now()): ApiResult | null {
+  if (role === "charuta" || role === "moderator" || !opensAt) return null;
+  const at = Date.parse(opensAt);
+  if (!Number.isFinite(at) || now >= at) return null;
+  return { status: 403, body: { error: "The party hasn't opened yet. Please come back at the start time!", opensAt } };
+}

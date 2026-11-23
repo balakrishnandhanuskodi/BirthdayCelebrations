@@ -606,7 +606,7 @@ export function Celebration({ join, onLeave }: { join: JoinInfo; onLeave: () => 
                 <li>❓ Ask her a question</li>
               </ul>
               <small>
-                {otherGuests.length} other {otherGuests.length === 1 ? "guest is" : "guests are"} here · you joined muted, unmute anytime
+                {otherGuests.length} other {otherGuests.length === 1 ? "guest is" : "guests are"} here{isModerator ? "" : " · you joined muted, unmute anytime"}
               </small>
             </div>
           )}
