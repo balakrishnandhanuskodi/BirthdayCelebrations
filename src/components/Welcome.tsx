@@ -95,7 +95,7 @@ export function Welcome({ onJoin, busy, error }: { onJoin: (r: JoinRequest) => v
             start();
           }}
         >
-          <div className="secret-note">🤫 Shh! Charuta doesn't know you're here. At each Friend Station she picks a card. If it's you, you'll ask her a question!</div>
+          <div className="secret-note">🎡 Watch Charuta play live! At each Friend Station she spins a wheel of everyone's names. If it lands on you, you'll ask her a question!</div>
           <label htmlFor="participant-name">Your name</label>
           <div className="input-wrap">
             <Icon name="users" size={18} />
@@ -140,7 +140,7 @@ export function CharutaLogin({ onJoin, busy, error }: { onJoin: (r: JoinRequest)
           <br />
           <em>Charuta!</em>
         </h1>
-        <p>Your birthday quest is ready. Who knows who's hiding inside…</p>
+        <p>Your birthday quest is ready, and your friends are waiting inside!</p>
         <form
           className="name-card"
           onSubmit={(e) => {
